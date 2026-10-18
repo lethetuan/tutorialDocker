@@ -24,93 +24,134 @@ Sau khi tải xong, chuyển xuống bước 3 để thực thi.
 ~~~bash
 #!/bin/bash
 
-# Sửa lỗi kiểm tra apt và yum
-if [ ! -z "$(which apt 2>/dev/null)" ]; then
-	sudo apt -y update	
-	sudo apt -y install git wget
-elif [ ! -z "$(which yum 2>/dev/null)" ]; then
-	sudo yum update -y
-	sudo yum install -y wget git
+# ==============================================================================
+# Script cài đặt Docker Engine & Docker Compose v5 (Mới nhất)
+# Hỗ trợ: Ubuntu / Debian / CentOS / RHEL / AlmaLinux / Rocky Linux
+# ==============================================================================
+
+set -e # Dừng script ngay nếu gặp lỗi
+
+# 1. Kiểm tra quyền Root
+if [ "$EUID" -ne 0 ]; then
+    echo "❌ Vui lòng chạy script bằng quyền root hoặc sudo: sudo bash $0"
+    exit 1
 fi
 
-is_ubuntu=$(awk -F '=' '/PRETTY_NAME/ { print $2 }' /etc/os-release | grep -i Ubuntu)
-is_centos=$(awk -F '=' '/PRETTY_NAME/ { print $2 }' /etc/os-release | grep -i CentOS)
-
-if [ ! -z "$is_ubuntu" ]; then
-	is_docker_exist=$(dpkg -l | grep -i docker)
-elif [ ! -z "$is_centos" ]; then
-	is_docker_exist=$(rpm -qa | grep docker)
+# 2. Nhận diện Hệ điều hành
+if [ -f /etc/os-release ]; then
+    . /etc/os-release
+    OS=$ID
 else
-	echo "Error: Current Linux release version is not supported, please use either centos or ubuntu."
-	exit 1
+    echo "❌ Không thể xác định hệ điều hành."
+    exit 1
 fi
 
-if [ ! -z "$is_docker_exist" ]; then
-	echo "Warning: docker already exists."
+echo "🔍 Đang khởi tạo cài đặt trên OS: $OS"
+
+# 3. Cài đặt Docker Engine từ Repositories chính thức
+install_docker_engine() {
+    case "$OS" in
+        ubuntu|debian)
+            echo "🔄 Cập nhật và cài đặt Docker Engine cho Ubuntu/Debian..."
+            apt-get update -y
+            apt-get remove -y docker docker-engine docker.io containerd runc 2>/dev/null || true
+            apt-get install -y ca-certificates curl gnupg lsb-release git
+
+            install -m 0755 -d /etc/apt/keyrings
+            curl -fsSL https://download.docker.com/linux/$OS/gpg -o /etc/apt/keyrings/docker.asc
+            chmod a+r /etc/apt/keyrings/docker.asc
+
+            echo \
+              "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/$OS \
+              $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+              tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+            apt-get update -y
+            apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin
+            ;;
+        centos|rhel|almalinux|rocky)
+            echo "🔄 Cập nhật và cài đặt Docker Engine cho RHEL/CentOS..."
+            yum remove -y docker docker-client docker-client-latest docker-common docker-latest docker-engine 2>/dev/null || true
+            yum install -y yum-utils git curl
+            yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+            yum install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin
+            ;;
+        *)
+            echo "❌ Hệ điều hành '$OS' chưa được hỗ trợ."
+            exit 1
+            ;;
+    esac
+}
+
+install_docker_engine
+
+# 4. Tải & Cài đặt Docker Compose v5 (Mới nhất từ GitHub Releases)
+echo "⚡ Đang kiểm tra và tải phiên bản Docker Compose v5 mới nhất..."
+
+# Tự động lấy tag phiên bản v5 mới nhất từ GitHub
+COMPOSE_V5_VERSION=$(curl -s https://api.github.com/repos/docker/compose/releases | grep -oE '"tag_name": "v5\.[0-9]+\.[0-9]+"' | head -n 1 | cut -d '"' -f 4)
+
+if [ -z "$COMPOSE_V5_VERSION" ]; then
+    echo "⚠️ Không lấy được tag tự động, sẽ dùng fallback bản v5 mặc định."
+    COMPOSE_V5_VERSION="v5.6.0"
 fi
 
-# Hàm cài đặt chung cho Docker Compose (Sửa lỗi Regex)
-function docker_compose_install()
-{
-	echo "Installing docker-compose..."
-	COMPOSE_VERSION=$(git ls-remote https://github.com/docker/compose | grep refs/tags | grep -oE "[0-9]+\.[0-9]+\.[0-9]+$" | sort --version-sort | tail -n 1)
-	sudo curl -L "https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-	sudo chmod +x /usr/local/bin/docker-compose
-}
+echo "📦 Phiên bản Compose v5 tìm thấy: $COMPOSE_V5_VERSION"
 
-function ubuntu_install()
-{
-	sudo apt-get -y update
-	sudo apt-get remove -y docker docker-engine docker.io containerd runc
-	sudo apt-get install -y apt-transport-https ca-certificates curl gnupg lsb-release software-properties-common git vim
-	
-	curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-	echo \
-		"deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu \
-		$(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-	sudo apt-get -y update
-	sudo apt-get install -y docker-ce docker-ce-cli containerd.io
-	
-	sudo systemctl enable docker.service
-	sudo systemctl start docker
-	
-	docker_compose_install
-	
-	is_docker_success=$(sudo docker run hello-world | grep -i "Hello from Docker")
-	if [ -z "$is_docker_success" ]; then
-		echo "Error: Docker installation Failed."
-		exit 1
-	fi
-	
-	echo "Docker and Docker-compose have been installed successfully on Ubuntu."
-}
+# Tạo thư mục CLI plugin chuẩn của Docker
+PLUGIN_DIR="/usr/local/lib/docker/cli-plugins"
+mkdir -p "$PLUGIN_DIR"
 
-function centos_install()
-{
-	sudo yum install -y yum-utils device-mapper-persistent-data lvm2 git vim
-	sudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
-	sudo yum -y install docker-ce docker-ce-cli containerd.io
-	sudo systemctl enable docker.service
-	sudo systemctl start docker
-	
-	docker_compose_install
+ARCH=$(uname -m)
+case "$ARCH" in
+    x86_64)  CLI_ARCH="x86_64" ;;
+    aarch64) CLI_ARCH="aarch64" ;;
+    armv7l)  CLI_ARCH="armv7" ;;
+    *) echo "❌ Kiến trúc $ARCH không hỗ trợ"; exit 1 ;;
+esac
 
-	is_docker_success=$(sudo docker run hello-world | grep -i "Hello from Docker")
-	if [ -z "$is_docker_success" ]; then
-		echo "Error: Docker installation Failed."
-		exit 1
-	fi
+OS_TYPE=$(uname -s | tr '[:upper:]' '[:lower:]')
 
-	echo "Docker and Docker-compose have been installed successfully on CentOS."
-}
+# Tải binary Docker Compose v5 về làm CLI Plugin
+DOWNLOAD_URL="https://github.com/docker/compose/releases/download/${COMPOSE_V5_VERSION}/docker-compose-${OS_TYPE}-${CLI_ARCH}"
 
-if [ ! -z "$is_ubuntu" ]; then
-	ubuntu_install
-elif [ ! -z "$is_centos" ]; then
-	centos_install
+echo "⬇️ Đang tải từ: $DOWNLOAD_URL"
+curl -L "$DOWNLOAD_URL" -o "$PLUGIN_DIR/docker-compose"
+chmod +x "$PLUGIN_DIR/docker-compose"
+
+# Cấu hình Alias/Link để gõ được cả 2 lệnh: 'docker compose' lẫn 'docker-compose'
+ln -sf "$PLUGIN_DIR/docker-compose" /usr/local/bin/docker-compose
+
+# 5. Khởi động Docker Service
+echo "⚙️ Đang bật Docker Service..."
+systemctl enable docker
+systemctl start docker
+
+# 6. Thêm User hiện tại vào Group 'docker' (chạy không cần sudo)
+SUDO_USER_NAME=${SUDO_USER:-$USER}
+if [ "$SUDO_USER_NAME" != "root" ]; then
+    usermod -aG docker "$SUDO_USER_NAME"
 fi
 
+# 7. Kiểm tra kết quả
+echo ""
+echo "=================================================="
+echo "✔️ KIỂM TRA PHIÊN BẢN ĐÃ CÀI ĐẶT:"
+docker --version
+docker compose version
 docker-compose --version
+echo "=================================================="
+
+if docker run --rm hello-world | grep -q "Hello from Docker!"; then
+    echo ""
+    echo "🎉 CÀI ĐẶT THÀNH CÔNG DOCKER & DOCKER COMPOSE $COMPOSE_V5_VERSION!"
+    if [ "$SUDO_USER_NAME" != "root" ]; then
+        echo "💡 Hãy gõ lệnh 'newgrp docker' (hoặc Đăng xuất / Đăng nhập lại) để dùng Docker mà không cần 'sudo'."
+    fi
+else
+    echo "❌ Cài đặt chưa hoàn tất thành công, vui lòng kiểm tra lại dịch vụ Docker."
+    exit 1
+fi
 ~~~
 
 ### Bước 3: Thực thi script
