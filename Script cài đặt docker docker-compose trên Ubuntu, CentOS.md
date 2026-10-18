@@ -16,7 +16,7 @@ Có 02 cách để tạo script như sau:
 
 **Cách 1: Dùng lệnh wget để tải script**
 ~~~bash
-wget https://gist.githubusercontent.com/congto/17f11864549e902ff23cffc6e5beb390/raw/b49956890a7f749e571bcd8eb0eb1a74b3457ca5/install_docker.sh
+wget https://raw.githubusercontent.com/lethetuan/tutorialDocker/refs/heads/main/install_docker.sh
 ~~~
 Sau khi tải xong, chuyển xuống bước 3 để thực thi.
 
@@ -114,7 +114,9 @@ docker-compose --version
 ~~~
 
 ### Bước 3: Thực thi script
+
 Lưu file trên và phân quyền: `chmod +x install_docker.sh`
+
 Thực hiện script: `bash install_docker.sh`
 
 **Kết quả:**
