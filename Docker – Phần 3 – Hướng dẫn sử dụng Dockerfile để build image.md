@@ -1,87 +1,136 @@
-Docker – Phần 3 – Hướng dẫn sử dụng Dockerfile để build image
+# Docker – Phần 3: Hướng Dẫn Sử Dụng Dockerfile Để Build Image
 
-Tiếp tục với seri docker, ở phần trước ta đã tìm hiểu về docker images và cách quản lý image trong docker. Tiếp theo, ta hãy cùng tìm hiểu về Dockerfile để biết cách tạo image từ Dockerfile nhé.
-1. Dockerfile là gì?
-Dockerfile là điểm bắt đầu để tạp image – nó mô tả ứng dụng và nói với docker cách để xây dựng nó thành 1 image. Nó bao gồm cách lệnh liên tiếp nhau được thực hiện tự động trên 1 image gốc để tạo ra một image mới. Dockerfile bắt đầu bằng chữ D và được đặt tên bắt buộc là Dockerfile. Ngoài tên này, các tên khác đều không hợp lệ
-Dưới đây là cấu trúc Dockerfile cơ bản:
+Chủ đề tiếp theo trong chuỗi bài viết về Docker sẽ tập trung vào **Dockerfile** — công cụ quan trọng giúp bạn tự định nghĩa và đóng gói ứng dụng thành một Docker Image hoàn chỉnh.
+
+---
+
+## 1. Dockerfile Là Gì?
+
+**Dockerfile** là một tệp văn bản (text file) chứa danh sách các chỉ thị (instructions) tiếp nối nhau. Docker dựa vào file này để tự động thực thi các lệnh và đóng gói ứng dụng thành một **Docker Image** mới.
+
+### Quy tắc quan trọng về tên file:
+- Tên mặc định chuẩn bắt buộc là: `Dockerfile` (Viết hoa chữ **D**, không có đuôi mở rộng như `.txt` hay `.md`).
+
+### Cấu trúc Dockerfile cơ bản:
+
+```dockerfile
 FROM alpine
 LABEL maintainer="hocchudong@gmail.com"
 RUN apk add --update nodejs nodejs-npm
 COPY . /src
 WORKDIR /src
-RUN  npm install
+RUN npm install
 EXPOSE 8080
 ENTRYPOINT ["node", "./app.js"]
-2. Các chỉ thị trong Dockerfile
-2.1. FROM
-Tất cả các Dockerfile đều bắt đầu với chỉ thị FROM. Đây là layer cơ sở của image để xây dựng image mới, phần còn lại của ứng dụng sẽ được thêm lên trên cùng dưới dạng các layer bổ sung. Nếu 1 ứng dụng chạy trên Linux thì điều quan trọng là chỉ thị FROM phải được đề cập đến 1 image dựa trên Linux.
+```
 
-2.2. LABEL
-Tiếp theo, Dockerfile tạo 1 LABEL dùng để thêm metadata vào image. LABEL là các cặp key–value đơn giản được lưu dưới dạng chuỗi. Có thể khai báo nhiều LABEL trong 1 Dockerfile.
-VD:
+---
+
+## 2. Các Chỉ Thị Căn Bản Trong Dockerfile
+
+### 2.1. `FROM`
+- Tất cả các Dockerfile **bắt buộc** phải khởi đầu bằng chỉ thị `FROM`.
+- Chỉ thị này xác định **Base Image** (Image nền) để từ đó xây dựng các lớp (layer) bổ sung.
+- *Lưu ý:* Nếu ứng dụng chạy trên Linux, Base Image được chọn phải dựa trên một hệ điều hành Linux (ví dụ: `alpine`, `ubuntu`, `debian`).
+
+### 2.2. `LABEL`
+- Dùng để thêm thông tin mô tả (metadata) vào Image.
+- Khai báo dưới dạng các cặp **Key-Value** dạng chuỗi.
+- Có thể sử dụng nhiều lệnh `LABEL` trong cùng một file.
+
+**Ví dụ:**
+```dockerfile
 LABEL maintainer="hocchudong@gmail.com"
 LABEL version="3.1"
-2.3. RUN
-RUN chạy một lệnh nào đó trong quá trình build image và sau khi chạy. Một layer sẽ được thêm lên ngay trên layer cơ sở và các gói sẽ được cài đặt ở layer này.
+```
 
+### 2.3. `RUN`
+- Dùng để thực thi câu lệnh Linux trong quá trình build Image (ví dụ: cài đặt thư viện, cập nhật hệ thống).
+- Mỗi lệnh `RUN` sẽ tạo ra một Layer mới đè lên lớp cơ sở.
 
-2.4. COPY
-Lệnh copy tạo ra 1 layer khác và sao chép vào ứng dụng các tệp phụ thuộc từ thư mục build image.
+### 2.4. `COPY`
+- Copy thư mục hoặc các file cần thiết từ máy Host vào bên trong Image tại thư mục được chỉ định.
+- Hành động này tạo ra một Image Layer mới.
 
-2.5. WORKDIR
-Tiếp theo Dockerfile sử dụng lệnh WORKDIR để đặt thư mục đang làm việc cho các chỉ thị khác như RUN, CMD, ENTRYPOINT, COPY, ADD, … Chỉ thị này không tạo ra một image layer mới.
-VD:
+### 2.5. `WORKDIR`
+- Đặt thư mục làm việc mặc định cho các chỉ thị tiếp theo như `RUN`, `CMD`, `ENTRYPOINT`, `COPY`, `ADD`,...
+- **Không** tạo ra Image Layer mới.
+
+**Ví dụ:**
+```dockerfile
 WORKDIR /src
-Sau WORKDIR, chỉ thị RUN npm install tạo một layer mới và sử dụng npm để cài đặt các phụ thuộc ứng dụng được liệt kê trong tệp package.json tại thư mục build.
+RUN npm install
+```
+*Giải thích:* Lệnh `npm install` sẽ được thực thi ngay tại thư mục `/src` đã thiết lập trước đó.
 
-2.6. EXPOSE
-Ứng dụng là 1 dịch vụ web chạy trên cổng 8080, do đó, Dockerfile ghi lại điều này bằng chỉ thị EXPOSE. Chủ thị được thêm vào dưới dạng metadata của image chứ không phải layer của image.
-VD:
+### 2.6. `EXPOSE`
+- Thông báo cổng mà ứng dụng lắng nghe bên trong Container.
+- Đóng vai trò là **Metadata / Tài liệu ghi chú**, không tạo ra Layer mới.
+- ⚠️ **Lưu ý quan trọng:** `EXPOSE` **không** tự động kết nối (port forwarding/NAT port) cổng của container ra ngoài máy Host.
+
+**Ví dụ:**
+```dockerfile
 EXPOSE 8080
-Lưu ý EXPOSE không có chức năng nat port từ máy host vào container.
-2.7. ENTRYPOINT
-Cuối cùng, ENTRYPOINT được sử dụng để chạy lệnh trong chỉ thị này khi container được chạy. Tham số được dùng để chuẩn bị các điều kiện setup cần thiết để chạy service trong container như tạo user, tạo thư mục, change owner, …
-Cú pháp:
-ENTRYPOINT ["executable", "param1", "param2"] (exec form, preferred)
-ENTRYPOINT command param1 param2 (shell form)
-ENTRYPOINT và CMD có tác dụng tương tự nhay. Nếu một Dockerfile có cả CMD và ENTRYPOINT thì CMD sẽ thành tham số cho ENTRYPOINT.
-VD:
-ENTRYPOINT ["node", "./app.js"]
-2.8. Một số chỉ thị khác
-2.8.1. ENV
-Chỉ thị ENV được sử dụng để khai báo các biến môi trường. Các biến này được khai báo dạng key – value.
-Các biến môi trường có thể được sử dụng trong các chỉ thị sau:
-- ADD
-- COPY
-- ENV
-- EXPOSE
-- FROM
-- LABEL
-- STOPSIGNAL
-- USER
-- VOLUMME
-- WORKDIR
-Cú pháp:
-ENV <key>=<value> ...
-2.8.2. CMD
-Chỉ thị CMD được dùng để truyền 1 lệnh của linux mỗi khi thực hiện khởi tạo một container từ image (image này được build từ Dockerfile)
-Cú pháp:
-CMD ["executable","param1","param2"]
-CMD ["param1","param2"] 
-CMD command param1 param2
-VD:
+```
 
+### 2.7. `ENTRYPOINT`
+- Định nghĩa lệnh mặc định sẽ chạy khi Container bắt đầu khởi động.
+- Thường dùng để chuẩn bị môi trường chạy dịch vụ (tạo user, gán quyền, khởi động app).
+
+**Cú pháp:**
+- *Exec form (Khuyên dùng):* `ENTRYPOINT ["executable", "param1", "param2"]`
+- *Shell form:* `ENTRYPOINT command param1 param2`
+
+> **Mối quan hệ giữa `ENTRYPOINT` và `CMD`:**
+> Nếu Dockerfile khai báo cả `ENTRYPOINT` và `CMD`, giá trị trong `CMD` sẽ trở thành **tham số mặc định** truyền vào cho `ENTRYPOINT`.
+
+### 2.8. Một Số Chỉ Thị Khác
+
+#### `ENV`
+Dùng để khai báo biến môi trường (Key-Value) cho Container.
+
+**Cú pháp:**
+```dockerfile
+ENV <key>=<value> ...
+```
+Các biến môi trường này có thể được tái sử dụng trong các chỉ thị khác như `COPY`, `RUN`, `WORKDIR`, `EXPOSE`,...
+
+#### `CMD`
+Dùng để thiết lập câu lệnh mặc định hoặc tham số truyền vào khi khởi tạo Container. Cổng lệnh trong `CMD` có thể bị đè (override) khi chạy lệnh `docker run`.
+
+**Cú pháp:**
+```dockerfile
+CMD ["executable","param1","param2"]
+CMD ["param1","param2"]
+CMD command param1 param2
+```
+
+**Ví dụ kết hợp:**
+```dockerfile
 FROM ubuntu
-RUN apt-get update
-RUN apt-get install wget -y
-CMD echo hocchudong
-3. Sử dụng Dockerfile để build image
-Sau khi hiểu các thành phần chỉ thị trong Dockerfile, ta sẽ tiến hành sử dụng nó để build image.
-Mình sẽ build 1 image mới với tên là web và có tag là latest. Bạn có thể down 1 ứng dụng web để thử nghiệm tại đây!
-Dấu . để yêu cầu docker sử dụng Dockerfile tại thư mục hiện tại của shell để build image.
+RUN apt-get update && apt-get install -y wget
+CMD ["echo", "hocchudong"]
+```
+
+---
+
+## 3. Thực Hành: Sử Dụng Dockerfile Để Build Image
+
+Dưới đây là từng bước tạo và chạy một Image ứng dụng web với tên `web` và tag `latest`.
+
+### Bước 1: Chuẩn bị mã nguồn và thực hiện Build
+
+Di chuyển vào thư mục chứa ứng dụng và chạy lệnh `docker image build`:
+
+```bash
 cd psweb
 docker image build -t web:latest .
-Dưới đây là toàn bộ log trong quá trình build
+```
+*(Dấu `.` thể hiện việc lấy Dockerfile tại thư mục hiện tại để build)*
+
+### Log chi tiết quá trình Build:
+
+```text
 Sending build context to Docker daemon  123.4kB
 Step 1/8 : FROM alpine
 latest: Pulling from library/alpine
@@ -118,32 +167,7 @@ Removing intermediate container 0e7bcd1a263d
  ---> 7042343c2cc6
 Step 6/8 : RUN  npm install
  ---> Running in 0294a08f831b
-npm WARN deprecated debug@4.1.1: Debug versions >=3.2.0 <3.2.7 || >=4 <4.3.1 have a low-severity ReDos regression when used in a Node.js environment. It is recommended you upgrade to 3.2.7 or 4.3.1. (https://github.com/visionmedia/debug/issues/797)
-npm WARN deprecated fsevents@2.1.3: "Please update to latest v2.3 or v2.2"
-npm WARN deprecated core-js@2.6.12: core-js@<3.3 is no longer maintained and not recommended for usage due to the number of issues. Because of the V8 engine whims, feature detection in old core-js versions could cause a slowdown up to 100x even if nothing is polyfilled. Please, upgrade your dependencies to the actual version of core-js.
-
-> core-js@2.6.12 postinstall /src/node_modules/core-js
-> node -e "try{require('./postinstall')}catch(e){}"
-
-Thank you for using core-js ( https://github.com/zloirock/core-js ) for polyfilling JavaScript standard library!
-
-The project needs your help! Please consider supporting of core-js on Open Collective or Patreon:
-> https://opencollective.com/core-js
-> https://www.patreon.com/zloirock
-
-Also, the author of core-js ( https://github.com/zloirock ) is looking for a good job -)
-
-npm notice created a lockfile as package-lock.json. You should commit this file.
-npm WARN optional SKIPPING OPTIONAL DEPENDENCY: fsevents@~2.1.2 (node_modules/chokidar/node_modules/fsevents):
-npm WARN notsup SKIPPING OPTIONAL DEPENDENCY: Unsupported platform for fsevents@2.1.3: wanted {"os":"darwin","arch":"any"} (current: {"os":"linux","arch":"x64"})
-
 added 270 packages from 227 contributors and audited 271 packages in 21.061s
-
-44 packages are looking for funding
-  run `npm fund` for details
-
-found 1 high severity vulnerability
-  run `npm audit fix` to fix them, or `npm audit` for details
 Removing intermediate container 0294a08f831b
  ---> 6789ff2fe587
 Step 7/8 : EXPOSE 8080
@@ -156,18 +180,36 @@ Removing intermediate container ab0915f2acfc
  ---> df8dcd620c0c
 Successfully built df8dcd620c0c
 Successfully tagged web:latest
-Liệt kê các image để kiểm tra:
-root@dockersrv:~/psweb# docker image ls 
+```
 
+### Bước 2: Kiểm tra danh sách Image
+
+```bash
+root@dockersrv:~/psweb# docker image ls
+```
+
+**Kết quả:**
+```text
 REPOSITORY         TAG          IMAGE ID          CREATED          SIZE
 web                latest       b0e41055ddb3      10 minutes ago   93.5MB
-Chạy container với image vừa build và nat port 8080 của container sang port 80 của docker host:
-docker container run -d --name web1 \
--p 80:8080 \
-web:latest
-Sau đó sử dụng trình duyệt truy cập vào web với địa chỉ http://<docker_host_ip>
+```
 
-4. Tổng kết
-Như vậy, ở phần này ta đã tìm hiểu về cách sử dụng Dockerfile để tự build 1 image và mình cũng giải thích các chỉ thị được sử dụng thường xuyên trong Dockerfile. Ở bài tiếp theo mình sẽ hướng dẫn các bạn cách để triển khai ứng dụng với docker compose, hãy tiếp tục theo dõi tại đây nhé.
-Tài liệu tham khảo
-[1]. https://www.amazon.com/Docker-Deep-Dive-Nigel-Poulton/dp/1521822808/ref=tmm_pap_swatch_0?_encoding=UTF8&qid=&sr=
+### Bước 3: Khởi chạy Container từ Image vừa tạo
+
+Chạy container dưới dạng ngầm (`-d`), đặt tên là `web1` và ánh xạ cổng `80` trên máy Host tới cổng `8080` của Container:
+
+```bash
+docker container run -d --name web1 \
+  -p 80:8080 \
+  web:latest
+```
+
+Sau khi chạy xong, mở trình duyệt web và truy cập theo đường dẫn: `http://<docker_host_ip>` để xem thành quả.
+
+---
+
+## 4. Tổng Kết
+
+Trong bài viết này, chúng ta đã nắm được khái niệm về Dockerfile, cách hoạt động của các chỉ thị phổ biến (`FROM`, `RUN`, `COPY`, `WORKDIR`, `EXPOSE`, `ENTRYPOINT`, `CMD`, `ENV`) và quy trình hoàn chỉnh để build một Docker Image từ mã nguồn. 
+
+Ở bài tiếp theo, chúng ta sẽ tìm hiểu cách quản lý và triển khai ứng dụng đa dịch vụ bằng **Docker Compose**.
