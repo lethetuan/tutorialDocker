@@ -1,7 +1,7 @@
 # Script cài đặt docker docker-compose trên Ubuntu, CentOS
 
 Để thuận tiện hơn trong quá trình lab hoặc dựng nhanh các môi trường cần thiết, HCD sưu tầm và tổng hợp được script cài đặt docker, docker-compose trên môi trường các hệ điều hành Ubuntu và CentOS. Script này đã được kiểm chứng với các hệ điều hành sau:
-- Ubuntu Server 18.04 64 bit.
+- Ubuntu Server 26.04.1 LTS 64 bit.
 - CentOS 7 Server 64 bit.
 
 ## Các bước thực hiện
